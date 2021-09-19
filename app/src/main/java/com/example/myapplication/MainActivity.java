@@ -30,6 +30,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     private ArrayList<Double> z_values = new ArrayList();
 
     private boolean xMinPassed = false;
+    private int cleanupCounter = 0;
 
 
     /** Called when the activity is first created. */
@@ -56,6 +57,18 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
     }
+
+    public double calculateCosEstError(double[] coefficients, ArrayList<Double> x_values) {
+        double error = 0.0;
+
+        for(int i = 0; i < x_values.size(); i++) {
+            double pred = coefficients[0] * Math.cos(coefficients[1] * (double)i + coefficients[2]);
+            error += Math.pow(x_values.get(i) - pred, 2);
+        }
+
+        return error;
+    }
+
     public double[] curveFit(ArrayList<Double> current_sample) {
         //double[] current_sample = {8.6675, 8.636854,8.63494,8.656487,8.639729,8.657924,8.63925,8.543486,8.407501,7.6514444,6.953325,5.887951,4.398822,2.899158,1.6408199,0.3518371,-0.67714655,-1.738211,-2.7777288,-3.8210769};
         double[] sample = new double[current_sample.size()];
@@ -79,15 +92,43 @@ public class MainActivity extends Activity implements SensorEventListener {
         return coefficients;
     }
 
+    public double normalizeError(double error, double min, double max) {
+        return 100 * (error - min)/(max - min);
+    }
+
+    public double getAccuracy(ArrayList<Double> values, double min, double max, boolean square_root) {
+        double[] coefficients = curveFit(values);
+        double error = calculateCosEstError(coefficients, values);
+
+        if(square_root) {
+            min = Math.sqrt(min);
+            max = Math.sqrt(max);
+            error = Math.sqrt(error);
+        }
+
+        System.out.print(", Error: " + error);
+
+        error = normalizeError(error, min, max);
+
+        return Math.max(0, Math.min(100 - error, 100));
+    }
+
+
     private void getAccelerometer(SensorEvent event) {
         float[] values = event.values;
         // Movement
         float x = values[0];
         float y = values[1];
         float z = values[2];
+        System.out.println(x);
 
         //System.out.println("Curve fit data:");
         x_values.add((double)x);
+        z_values.add((double)z);
+
+        if(x_values.size() <= 2) {
+            return;
+        }
 
         if(x_values.get(x_values.size() - 1) < 0 &&
                 (x_values.get(x_values.size() - 1) > x_values.get(x_values.size() - 2))) {
@@ -95,12 +136,24 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
         if(xMinPassed) {
+
+            if(cleanupCounter < 20) {
+                cleanupCounter++;
+                return;
+            }
+
             if(x_values.get(x_values.size() - 1) > 0 &&
                     (x_values.get(x_values.size() - 1) < x_values.get(x_values.size() - 2))) {
                 // REP COMPLETE
-                double[] coefficients = curveFit(x_values);
-                System.out.println(coefficients[0]);
+                double x_acc = getAccuracy(x_values, 100, 900, false);
+                double z_acc = getAccuracy(z_values, 0, 100, true);
+
+                // System.out.print(", x_acc: " + x_acc);
+                System.out.println("x_acc: " + x_acc + ", z_acc: " + z_acc);
+
                 xMinPassed = false;
+                x_values.clear();
+                z_values.clear();
             }
         }
 
@@ -109,21 +162,6 @@ public class MainActivity extends Activity implements SensorEventListener {
         long actualTime = event.timestamp;
 
         // System.out.println(x + "," + y + "," + z);
-        if (accelerationSquareRoot >= 2) //
-        {
-            if (actualTime - lastUpdate < 200) {
-                return;
-            }
-            lastUpdate = actualTime;
-            Toast.makeText(this, "Device was shuffed", Toast.LENGTH_SHORT)
-                    .show();
-            if (color) {
-                view.setBackgroundColor(Color.GREEN);
-            } else {
-                view.setBackgroundColor(Color.RED);
-            }
-            color = !color;
-        }
 
     }
 
