@@ -32,6 +32,10 @@ public class MainActivity extends Activity implements SensorEventListener {
     private boolean xMinPassed = false;
     private int cleanupCounter = 0;
 
+    private double Z_MIN = -9.81;
+    private double Z_THRESH = -4;
+    private double Z_MAX = -3;
+    private double Z_EXTREME = 0;
 
     /** Called when the activity is first created. */
     @Override
@@ -92,8 +96,8 @@ public class MainActivity extends Activity implements SensorEventListener {
         return coefficients;
     }
 
-    public double normalizeError(double error, double min, double max) {
-        return 100 * (error - min)/(max - min);
+    public double normalize(double value, double min, double max) {
+        return 100 * (value - min)/(max - min);
     }
 
     public double getAccuracy(ArrayList<Double> values, double min, double max, boolean square_root) {
@@ -108,7 +112,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         System.out.print(", Error: " + error);
 
-        error = normalizeError(error, min, max);
+        error = normalize(error, min, max);
 
         return Math.max(0, Math.min(100 - error, 100));
     }
@@ -152,6 +156,17 @@ public class MainActivity extends Activity implements SensorEventListener {
                 double z_acc = getAccuracy(z_values, 0, 100, true);
 
                 // range of motion checker
+                double z_peak = Collections.max(z_values);
+
+                if(z_peak > Z_MAX) {
+                    // Check if weight goes behind you
+                    double rom_score = 100 - Math.min(100, normalize(z_peak, Z_MAX, Z_EXTREME));
+                } else {
+                    // Check that ROM is full
+                    double rom_score = Math.min(100, normalize(z_peak, Z_MIN, Z_THRESH));
+                }
+
+
 
 
 
