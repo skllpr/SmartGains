@@ -10,19 +10,35 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 import android.widget.TextView;
+
+import androidx.annotation.RequiresApi;
 
 //import com.example.myapplication.databinding.ActivityMainBinding;
 
 public class MainActivity extends Activity implements SensorEventListener {
     private SensorManager sensorManager;
+    private Vibrator vibrator;
+    private VibrationEffect effect;
     private boolean color = false;
     private View view;
+    private ProgressBar progressBar;
+    private TextView repCount;
+    private TextView repText;
+    private boolean setComplete = false;
+    private int correctReps = 0;
+    private final int MAX_REPS = 14;
+    private double sumTotal = 0;
+    private int totalCount = 0;
     private long lastUpdate;
 
     private ArrayList<Double> x_values = new ArrayList();
@@ -52,13 +68,17 @@ public class MainActivity extends Activity implements SensorEventListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         view = findViewById(R.id.text);
-        view.setBackgroundColor(Color.GREEN);
+        progressBar = findViewById(R.id.progressBar);
+        repCount = findViewById(R.id.repCount);
+        repText = findViewById(R.id.repText);
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         lastUpdate = System.currentTimeMillis();
 
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -123,6 +143,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     }
 
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     private void getAccelerometer(SensorEvent event) {
         float[] values = event.values;
         // Movement
@@ -202,6 +223,30 @@ public class MainActivity extends Activity implements SensorEventListener {
 
                 double total_score = y_score * (rom_score + x_acc + z_acc) / 300;
                 String text = total_score > 80 ? "Great job!" : "Bruh, please...";
+
+                sumTotal += total_score;
+                totalCount++;
+
+                if (total_score > 70) {
+                    correctReps++;
+
+                    if (correctReps < MAX_REPS) {
+                        progressBar.setProgress((int) ((double) correctReps / MAX_REPS * 100));
+                        repCount.setText(String.valueOf(correctReps));
+                    } else if(!setComplete) {
+                        progressBar.setProgress(100);
+                        repCount.setText(String.valueOf(MAX_REPS));
+
+                        effect = VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE);
+                        vibrator.vibrate(effect);
+
+                        progressBar.setVisibility(View.INVISIBLE);
+                        repText.setVisibility(View.INVISIBLE);
+                        repCount.setText("Score: " + String.format("%.2f", (sumTotal / totalCount)));
+
+                        setComplete = true;
+                    }
+                }
 
 //                System.out.println("x_acc: " + x_acc);
                 System.out.println("z_acc: " + z_acc);
