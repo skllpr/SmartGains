@@ -33,9 +33,14 @@ public class MainActivity extends Activity implements SensorEventListener {
     private int cleanupCounter = 0;
 
     private double Z_MIN = -9.81;
-    private double Z_THRESH = -4;
-    private double Z_MAX = -3;
+    private double Z_THRESH = -3;
+    private double Z_MAX = -0.5;
     private double Z_EXTREME = 0;
+
+    private double X_THRESH_LOWER = -6.5;
+    private double X_THRESH_UPPER = 7.5;
+
+    private double Y_MAX = 0;
 
     /** Called when the activity is first created. */
     @Override
@@ -110,7 +115,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             error = Math.sqrt(error);
         }
 
-        System.out.print(", Error: " + error);
+        // System.out.print("Error: " + error);
 
         error = normalize(error, min, max);
 
@@ -124,9 +129,6 @@ public class MainActivity extends Activity implements SensorEventListener {
         float x = values[0];
         float y = values[1];
         float z = values[2];
-        System.out.println(x);
-
-        float y_thresh = 0;
 
         //System.out.println("Curve fit data:");
         x_values.add((double)x);
@@ -152,46 +154,76 @@ public class MainActivity extends Activity implements SensorEventListener {
             if(x_values.get(x_values.size() - 1) > 0 &&
                     (x_values.get(x_values.size() - 1) < x_values.get(x_values.size() - 2))) {
                 // REP COMPLETE
-                double x_acc = getAccuracy(x_values, 100, 900, false);
-                double z_acc = getAccuracy(z_values, 0, 100, true);
+                double x_acc = 100; // getAccuracy(x_values, 100, 900, false);
+                double z_acc = getAccuracy(z_values, 75, 300, false);
 
                 // range of motion checker
                 double z_peak = Collections.max(z_values);
 
+                double z_rom_score = 0;
+                double x_rom_score_upper = 100;
+                double x_rom_score_lower = 100;
+
                 if(z_peak > Z_MAX) {
                     // Check if weight goes behind you
-                    double rom_score = 100 - Math.min(100, normalize(z_peak, Z_MAX, Z_EXTREME));
+                    z_rom_score = 100 - Math.min(100, normalize(z_peak, Z_MAX, Z_EXTREME));
                 } else {
                     // Check that ROM is full
-                    double rom_score = Math.min(100, normalize(z_peak, Z_MIN, Z_THRESH));
+                    z_rom_score = Math.min(100, normalize(z_peak, Z_MIN, Z_THRESH));
                 }
 
+                double x_peak = Collections.max(x_values);
+                double x_trough = Collections.min(x_values);
 
+                if(x_peak < X_THRESH_UPPER) {
+                    x_rom_score_upper = Math.min(100, normalize(x_peak, 0, X_THRESH_UPPER));
+                }
+                if(x_peak < X_THRESH_LOWER) {
+                    x_rom_score_lower = 100 - Math.min(100, normalize(x_trough, X_THRESH_LOWER, 0));
+                }
 
+                double rom_score = (z_rom_score + x_rom_score_upper + x_rom_score_lower) / 3;
+                // System.out.println("ROM Scores: " + z_rom_score + ", " + x_rom_score_upper + ", " + x_rom_score_lower);
 
-
-                float sum = 0;
+                float avg = 0;
+                int counter = 0;
                 for(int i = 0; i < y_values.size(); i++) {
-                    sum += Math.max(y_thresh, y_values.get(i));
+                    double add = Math.max(Y_MAX, y_values.get(i));
+                    if(add > 0) {
+                        avg += add;
+                        counter++;
+                    }
+                }
+                double y_score = 100;
+                if(counter > 0) {
+                    avg = avg / counter;
+                    y_score = 100 - Math.min(100, normalize(avg, 0, 1));
                 }
 
+                double total_score = y_score * (rom_score + x_acc + z_acc) / 300;
+                String text = total_score > 80 ? "Great job!" : "Bruh, please...";
 
+//                System.out.println("x_acc: " + x_acc);
+                System.out.println("z_acc: " + z_acc);
+//                System.out.println("tilt: " + y_score);
+//                System.out.println("z_rom: " + z_rom_score);
+//                System.out.println("x_up: " + x_rom_score_upper);
+//                System.out.println("x_low: " + x_rom_score_lower);
+
+                //System.out.println("Your y score was: " + y_score);
+
+                System.out.println(text + " Your score was " + total_score);
+                System.out.println();
 
                 // System.out.print(", x_acc: " + x_acc);
-                System.out.println("x_acc: " + x_acc + ", z_acc: " + z_acc);
+                // System.out.println("x_acc: " + x_acc + ", z_acc: " + z_acc);
 
                 xMinPassed = false;
                 x_values.clear();
+                y_values.clear();
                 z_values.clear();
             }
         }
-
-        float accelerationSquareRoot = (x * x + y * y + z * z)
-                / (SensorManager.GRAVITY_EARTH * SensorManager.GRAVITY_EARTH);
-        long actualTime = event.timestamp;
-
-        // System.out.println(x + "," + y + "," + z);
-
     }
 
     @Override
