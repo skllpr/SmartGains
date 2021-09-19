@@ -25,6 +25,13 @@ public class MainActivity extends Activity implements SensorEventListener {
     private View view;
     private long lastUpdate;
 
+    private ArrayList<Double> x_values = new ArrayList();
+    private ArrayList<Double> y_values = new ArrayList();
+    private ArrayList<Double> z_values = new ArrayList();
+
+    private boolean xMinPassed = false;
+
+
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -39,6 +46,7 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         lastUpdate = System.currentTimeMillis();
+
     }
 
     @Override
@@ -48,11 +56,15 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
     }
-    public void curveFit() {
-        double[] current_sample = new double[300];
-        double[] half_cycle = Arrays.copyOfRange(current_sample, 175, 225);
+    public double[] curveFit(ArrayList<Double> current_sample) {
+        //double[] current_sample = {8.6675, 8.636854,8.63494,8.656487,8.639729,8.657924,8.63925,8.543486,8.407501,7.6514444,6.953325,5.887951,4.398822,2.899158,1.6408199,0.3518371,-0.67714655,-1.738211,-2.7777288,-3.8210769};
+        double[] sample = new double[current_sample.size()];
+        for(int i = 0; i < current_sample.size(); i++) {
+            sample[i] = current_sample.get(i);
+        }
+
         StandardDeviation sd = new StandardDeviation(false);
-        double amp = 3*sd.evaluate(half_cycle)/Math.sqrt(2);
+        double amp = 3*sd.evaluate(sample)/Math.sqrt(2);
         //double amp = 3*ArrayUtils.std(half_cycle)/Math.sqrt(2);
         double freq = 0;
         double phase = 0;
@@ -60,13 +72,11 @@ public class MainActivity extends Activity implements SensorEventListener {
         HarmonicCurveFitter curveFit = HarmonicCurveFitter.create();
         curveFit.withStartPoint(guess);
         List<WeightedObservedPoint> points = new ArrayList<WeightedObservedPoint>();
-        for (int i=0; i < half_cycle.length; i++) {
-            points.add(new WeightedObservedPoint(1.0, i, half_cycle[i]));
+        for (int i=0; i < sample.length; i++) {
+            points.add(new WeightedObservedPoint(1.0, i, sample[i]));
         }
-        double[] vals = curveFit.fit(points);
-        for (double val: vals){
-            System.out.println(val);
-        }
+        double[] coefficients = curveFit.fit(points);
+        return coefficients;
     }
 
     private void getAccelerometer(SensorEvent event) {
@@ -75,11 +85,30 @@ public class MainActivity extends Activity implements SensorEventListener {
         float x = values[0];
         float y = values[1];
         float z = values[2];
+
+        //System.out.println("Curve fit data:");
+        x_values.add((double)x);
+
+        if(x_values.get(x_values.size() - 1) < 0 &&
+                (x_values.get(x_values.size() - 1) > x_values.get(x_values.size() - 2))) {
+            xMinPassed = true;
+        }
+
+        if(xMinPassed) {
+            if(x_values.get(x_values.size() - 1) > 0 &&
+                    (x_values.get(x_values.size() - 1) < x_values.get(x_values.size() - 2))) {
+                // REP COMPLETE
+                double[] coefficients = curveFit(x_values);
+                System.out.println(coefficients[0]);
+                xMinPassed = false;
+            }
+        }
+
         float accelerationSquareRoot = (x * x + y * y + z * z)
                 / (SensorManager.GRAVITY_EARTH * SensorManager.GRAVITY_EARTH);
         long actualTime = event.timestamp;
 
-        System.out.println(x + "," + y + "," + z);
+        // System.out.println(x + "," + y + "," + z);
         if (accelerationSquareRoot >= 2) //
         {
             if (actualTime - lastUpdate < 200) {
@@ -95,6 +124,7 @@ public class MainActivity extends Activity implements SensorEventListener {
             }
             color = !color;
         }
+
     }
 
     @Override
