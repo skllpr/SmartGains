@@ -122,8 +122,11 @@ public class MainActivity extends Activity implements SensorEventListener {
         float z = values[2];
         System.out.println(x);
 
+        float y_thresh = 0;
+
         //System.out.println("Curve fit data:");
         x_values.add((double)x);
+        y_values.add((double)y);
         z_values.add((double)z);
 
         if(x_values.size() <= 2) {
@@ -147,6 +150,17 @@ public class MainActivity extends Activity implements SensorEventListener {
                 // REP COMPLETE
                 double x_acc = getAccuracy(x_values, 100, 900, false);
                 double z_acc = getAccuracy(z_values, 0, 100, true);
+
+                // range of motion checker
+
+
+
+                float sum = 0;
+                for(int i = 0; i < y_values.size(); i++) {
+                    sum += Math.max(y_thresh, y_values.get(i));
+                }
+
+
 
                 // System.out.print(", x_acc: " + x_acc);
                 System.out.println("x_acc: " + x_acc + ", z_acc: " + z_acc);
